@@ -1,11 +1,119 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0f19"><title>CRYPTORA — Digital Asset Exchange</title><link rel="stylesheet" href="styles.css"></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0f19">
+  <title>CRYPTORA — Digital Asset Exchange</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 <div class="app-shell">
-<header class="topbar"><a class="brand" href="#overview"><span class="brand-mark">C</span><span>CRYPTORA</span></a><nav class="main-nav"><a class="active" href="#overview">Overview</a><a href="#markets">Markets</a><a href="#trade">Trade</a><a href="#wallet">Wallet</a><a href="#orders">Orders</a></nav><div class="top-actions"><button class="icon-btn" id="themeBtn" title="Toggle theme">☼</button><button class="ghost" id="loginBtn">Log In</button><button class="primary" id="registerBtn">Create Account</button></div></header>
+<header class="topbar">
+  <a class="brand" href="#overview"><span class="brand-mark">C</span><span>CRYPTORA</span></a>
+  <nav class="main-nav">
+    <a class="active" href="#overview">Overview</a><a href="#markets">Markets</a><a href="#trade">Trade</a><a href="#wallet">Wallet</a><a href="#orders">Orders</a>
+  </nav>
+  <div class="top-actions">
+    <button class="icon-btn" id="themeBtn" title="Toggle theme">☼</button>
+    <span id="accountLabel" class="account-label" aria-live="polite">Guest</span>
+    <button class="ghost" id="loginBtn">Log In</button>
+    <button class="primary" id="registerBtn">Create Account</button>
+    <button class="ghost" id="logoutBtn" hidden>Log Out</button>
+  </div>
+</header>
+
 <main>
-<section id="overview" class="hero"><div class="hero-copy"><div class="eyebrow"><span class="live-dot"></span> LIVE MARKET DATA <span class="mode">TEST MODE</span></div><h1>Trade the market.<br><span>Built for clarity.</span></h1><p>Track global crypto markets, manage your portfolio and test Buy/Sell orders through a professional exchange interface.</p><div class="hero-actions"><button class="primary large" onclick="location.hash='#markets'">Explore Markets <span>→</span></button><button class="ghost large" onclick="location.hash='#trade'">Start Trading</button></div><div class="hero-meta"><span><b id="assetCount">0</b> assets tracked</span><span>•</span><span>Prices in USD</span><span>•</span><span id="lastUpdated">Updating…</span></div></div><div class="hero-panel"><div class="panel-head"><span>Portfolio Overview</span><span class="status">TEST</span></div><div class="portfolio-value" id="portfolio">$1,000.00</div><div class="pnl"><span>24h Portfolio P&amp;L</span><strong class="up">+$0.00 <small>0.00%</small></strong></div><div class="mini-chart"><i style="height:30%"></i><i style="height:45%"></i><i style="height:35%"></i><i style="height:58%"></i><i style="height:42%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:82%"></i><i style="height:76%"></i><i style="height:92%"></i><i style="height:84%"></i><i style="height:98%"></i></div></div></section>
-<section class="quick-grid"><div class="quick-card"><span>Total Balance</span><strong id="usdBalance">$1,000.00</strong><small>USD Wallet</small></div><div class="quick-card"><span>Market Status</span><strong class="up">● Live</strong><small id="marketSource">CoinGecko Market Data</small></div><div class="quick-card"><span>Trading Fee</span><strong>0.10%</strong><small>Test trading</small></div><div class="quick-card"><span>Account</span><strong>Demo</strong><small>Authentication ready</small></div></section>
-<section id="markets" class="section"><div class="section-head"><div><div class="section-kicker">MARKET OVERVIEW</div><h2>Top Crypto Markets</h2><p>Live market-cap ranking. CRYPTORA custom assets can be merged into this list.</p></div><div class="market-tools"><div class="search"><span>⌕</span><input id="search" placeholder="Search coin or symbol…"></div><button class="ghost compact" id="refreshBtn">↻ Refresh</button></div></div><div class="market-tabs"><button class="tab active">All</button><button class="tab">Top Gainers</button><button class="tab">Top Losers</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Asset</th><th>Price</th><th>24h Change</th><th>Market Cap</th><th>24h Volume</th><th></th></tr></thead><tbody id="marketRows"><tr><td colspan="7" class="loading">Loading live market data…</td></tr></tbody></table></div><div class="data-note" id="dataNote">Live prices are requested directly from the market data provider. No fake price fallback is used.</div></section>
-<section id="trade" class="section trade-section"><div class="section-head"><div><div class="section-kicker">TEST TRADING</div><h2>Buy &amp; Sell</h2><p>Practice exchange orders using live market prices. No real money or blockchain transfer.</p></div></div><div class="trade-layout"><div class="trade-card"><div class="trade-tabs"><button class="trade-tab active" data-side="Buy">Buy</button><button class="trade-tab" data-side="Sell">Sell</button></div><label>Asset<select id="assetSelect"></select></label><div class="price-row"><span>Market Price</span><strong id="tradePrice">—</strong></div><label>Amount (USD)<div class="input-wrap"><span>$</span><input id="tradeAmount" type="number" min="0" step="0.01" placeholder="100.00"></div></label><div class="summary"><div><span>Trading Fee</span><b id="fee">$0.00</b></div><div><span>Total</span><b id="total">$0.00</b></div></div><button class="primary full" id="tradeBtn">Place Test Order</button><div id="tradeMsg" class="msg"></div></div><div class="portfolio-card"><div class="card-head"><div><span class="section-kicker">YOUR PORTFOLIO</span><h3>Holdings</h3></div><span class="tiny">Demo account</span></div><div id="holdings" class="holdings"></div></div></div></section>
-<section id="wallet" class="section"><div class="wallet-card"><div><div class="section-kicker">USD WALLET</div><h2 id="walletTotal">$1,000.00</h2><p>Available test balance</p></div><div class="wallet-actions"><button class="primary" id="depositBtn">Deposit</button><button class="ghost" id="withdrawBtn">Withdraw</button></div></div></section>
-<section id="orders" class="section"><div class="section-head"><div><div class="section-kicker">ACTIVITY</div><h2>Order History</h2><p>Your recent test trading activity.</p></div></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Asset</th><th>Side</th><th>USD Amount</th><th>Fee</th><th>Status</th></tr></thead><tbody id="orderRows"><tr><td colspan="6" class="empty">No orders yet.</td></tr></tbody></table></div></section>
-</main><footer><div class="brand small"><span class="brand-mark">C</span> CRYPTORA</div><span>© 2026 CRYPTORA. Test environment.</span><span>Market data powered by CoinGecko.</span></footer></div><script src="config.js"></script><script src="app.js"></script></body></html>
+<section id="overview" class="hero">
+  <div class="hero-copy">
+    <div class="eyebrow"><span class="live-dot"></span> LIVE MARKET DATA <span class="mode">TEST MODE</span></div>
+    <h1>Trade the market.<br><span>Built for clarity.</span></h1>
+    <p>Track global crypto markets, manage your portfolio and explore a professional exchange interface.</p>
+    <div class="hero-actions">
+      <button class="primary large" onclick="location.hash='#markets'">Explore Markets <span>→</span></button>
+      <button class="ghost large" onclick="location.hash='#trade'">Start Trading</button>
+    </div>
+    <div class="hero-meta"><span><b id="assetCount">0</b> assets tracked</span><span>•</span><span>Prices in USD</span><span>•</span><span id="lastUpdated">Updating…</span></div>
+  </div>
+  <div class="hero-panel">
+    <div class="panel-head"><span>Portfolio Overview</span><span class="status">TEST</span></div>
+    <div class="portfolio-value" id="portfolio">—</div>
+    <div class="pnl"><span>Account status</span><strong id="portfolioStatus">Sign in to view wallet</strong></div>
+    <div class="mini-chart"><i style="height:30%"></i><i style="height:45%"></i><i style="height:35%"></i><i style="height:58%"></i><i style="height:42%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:82%"></i><i style="height:76%"></i><i style="height:92%"></i><i style="height:84%"></i><i style="height:98%"></i></div>
+  </div>
+</section>
+
+<section class="quick-grid">
+  <div class="quick-card"><span>Total Balance</span><strong id="usdBalance">—</strong><small>USD Wallet</small></div>
+  <div class="quick-card"><span>Market Status</span><strong class="up">● Live</strong><small id="marketSource">CoinGecko Market Data</small></div>
+  <div class="quick-card"><span>Trading Fee</span><strong>0.10%</strong><small>Test environment</small></div>
+  <div class="quick-card"><span>Account</span><strong id="accountStatus">Guest</strong><small id="accountHint">Log in to access your wallet</small></div>
+</section>
+
+<section id="markets" class="section">
+  <div class="section-head">
+    <div><div class="section-kicker">MARKET OVERVIEW</div><h2>Top Crypto Markets</h2><p>Live market-cap ranking. CRYPTORA custom assets can be merged into this list.</p></div>
+    <div class="market-tools"><div class="search"><span>⌕</span><input id="search" placeholder="Search coin or symbol…"></div><button class="ghost compact" id="refreshBtn">↻ Refresh</button></div>
+  </div>
+  <div class="market-tabs"><button class="tab active" type="button">All</button><button class="tab" type="button">Top Gainers</button><button class="tab" type="button">Top Losers</button></div>
+  <div class="table-wrap"><table><thead><tr><th>#</th><th>Asset</th><th>Price</th><th>24h Change</th><th>Market Cap</th><th>24h Volume</th><th></th></tr></thead><tbody id="marketRows"><tr><td colspan="7" class="loading">Loading live market data…</td></tr></tbody></table></div>
+  <div class="data-note" id="dataNote">Live prices are requested directly from the market data provider. No fake price fallback is used.</div>
+</section>
+
+<section id="trade" class="section trade-section">
+  <div class="section-head"><div><div class="section-kicker">TEST TRADING</div><h2>Buy &amp; Sell</h2><p>Trading is not connected to a secure server-side order engine yet. No real funds or blockchain transfers.</p></div></div>
+  <div class="trade-layout">
+    <div class="trade-card">
+      <div class="trade-tabs"><button class="trade-tab active" data-side="Buy">Buy</button><button class="trade-tab" data-side="Sell">Sell</button></div>
+      <label>Asset<select id="assetSelect"></select></label>
+      <div class="price-row"><span>Market Price</span><strong id="tradePrice">—</strong></div>
+      <label>Amount (USD)<div class="input-wrap"><span>$</span><input id="tradeAmount" type="number" min="0" step="0.01" placeholder="100.00"></div></label>
+      <div class="summary"><div><span>Trading Fee</span><b id="fee">$0.00</b></div><div><span>Total</span><b id="total">$0.00</b></div></div>
+      <button class="primary full" id="tradeBtn" disabled>Trading unavailable</button>
+      <div id="tradeMsg" class="msg">Trading will be enabled after a secure server-side order engine is implemented.</div>
+    </div>
+    <div class="portfolio-card">
+      <div class="card-head"><div><span class="section-kicker">YOUR PORTFOLIO</span><h3>Holdings</h3></div><span class="tiny">Account</span></div>
+      <div id="holdings" class="holdings"><div class="empty">Sign in to view holdings.</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="wallet" class="section">
+  <div class="wallet-card"><div><div class="section-kicker">USD WALLET</div><h2 id="walletTotal">—</h2><p id="walletDescription">Sign in to view your USD wallet balance.</p></div><div class="wallet-actions"><button class="primary" id="depositBtn">Deposit</button><button class="ghost" id="withdrawBtn">Withdraw</button></div></div>
+</section>
+
+<section id="orders" class="section">
+  <div class="section-head"><div><div class="section-kicker">ACTIVITY</div><h2>Order History</h2><p>Your trading activity will appear here when the secure order system is added.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Time</th><th>Asset</th><th>Side</th><th>USD Amount</th><th>Fee</th><th>Status</th></tr></thead><tbody id="orderRows"><tr><td colspan="6" class="empty">No orders yet.</td></tr></tbody></table></div>
+</section>
+</main>
+<footer><div class="brand small"><span class="brand-mark">C</span> CRYPTORA</div><span>© 2026 CRYPTORA. Test environment.</span><span>Market data powered by CoinGecko.</span></footer>
+</div>
+
+<div class="auth-overlay" id="authModal" hidden>
+  <section class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="auth-close" id="authClose" type="button" aria-label="Close">×</button>
+    <div class="brand auth-brand"><span class="brand-mark">C</span><span>CRYPTORA</span></div>
+    <h2 id="authTitle">Welcome back</h2>
+    <p id="authSubtitle">Log in to your CRYPTORA account.</p>
+    <form id="authForm">
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      <label for="authPassword">Password</label>
+      <input id="authPassword" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters">
+      <label id="displayNameLabel" for="authDisplayName" hidden>Display name</label>
+      <input id="authDisplayName" type="text" autocomplete="name" maxlength="60" placeholder="Your name" hidden>
+      <button class="primary full" id="authSubmit" type="submit">Log In</button>
+    </form>
+    <p class="auth-switch" id="authSwitch">New to CRYPTORA? <button type="button" id="switchAuth">Create an account</button></p>
+    <div class="auth-message" id="authMessage" role="status" aria-live="polite"></div>
+    <small class="auth-note">Use a valid email address. If email confirmation is enabled, confirm your email before logging in.</small>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
