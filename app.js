@@ -1,605 +1,325 @@
+(() => {
+  'use strict';
 
-const feeRate = CRYPTORA_CONFIG.TRADING_FEE || 0.001;
+  const config = window.CRYPTORA_CONFIG || {};
+  const feeRate = Number(config.TRADING_FEE || 0.001);
+  const API = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h';
+  const $ = (selector) => document.querySelector(selector);
 
-let usd = 1000;
-let coins = {};
-let assets = [];
-let orders = [];
-let currentSide = 'Buy';
-let marketTimer;
+  let assets = [];
+  let currentSide = 'Buy';
+  let currentUser = null;
+  let currentProfile = null;
+  let walletBalance = null;
+  let authMode = 'login';
+  let marketTimer = null;
+  let supabase = null;
 
-const API = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h';
-
-const $ = s => document.querySelector(s);
-
-const money = n => '$' + Number(n).toLocaleString('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 8
-});
-
-const compact = n => '$' + Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 2
-}).format(Number(n || 0));
-
-
-// CUSTOM ASSETS
-
-function customAssets() {
-  try {
-    return JSON.parse(
-      localStorage.getItem('cryptora_custom_assets') || '[]'
-    );
-  } catch {
-    return [];
-  }
-}
-
-
-// MARKET CAP
-
-function marketCap(a) {
-  return Number(a.price) * Number(a.supply || 0);
-}
-
-
-// NORMALIZE LIVE COINS
-
-function normalized(c) {
-  return {
-    id: c.id,
-    name: c.name,
-    symbol: (c.symbol || '').toUpperCase(),
-    price: Number(c.current_price || c.price || 0),
-    supply: Number(c.circulating_supply || c.supply || 0),
-    change: Number(
-      c.price_change_percentage_24h_in_currency ??
-      c.change ??
-      0
-    ),
-    volume: Number(c.total_volume || 0),
-    logo: c.image || c.logo || ''
-  };
-}
-
-
-// MERGE LIVE + CUSTOM COINS
-
-function mergeAssets(live) {
-  const custom = customAssets().map(c => ({
-    id: 'custom-' + c.symbol,
-    name: c.name,
-    symbol: String(c.symbol).toUpperCase(),
-    price: Number(c.price),
-    supply: Number(c.supply || 0),
-    change: Number(c.change || 0),
-    volume: Number(c.volume || 0),
-    logo: c.logo || '',
-    custom: true
-  }));
-
-  const map = new Map(
-    live.map(a => [a.symbol, a])
-  );
-
-  custom.forEach(a => {
-    map.set(a.symbol, a);
+  const money = (value) => '$' + Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2, maximumFractionDigits: 8
   });
+  const compact = (value) => '$' + Intl.NumberFormat('en-US', {
+    notation: 'compact', maximumFractionDigits: 2
+  }).format(Number(value || 0));
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
 
-  return [...map.values()]
-    .sort((a, b) => marketCap(b) - marketCap(a))
-    .slice(0, 100);
-}
-
-
-// COIN LOGO DISPLAY
-
-function coinLogo(a) {
-  const symbol = String(a.symbol || '?');
-  const fallback = symbol.charAt(0);
-
-  if (!a.logo) {
-    return `
-      <span style="
-        width:30px;
-        height:30px;
-        min-width:30px;
-        border-radius:50%;
-        background:#26334a;
-        color:#fff;
-        display:grid;
-        place-items:center;
-        font-size:13px;
-        font-weight:700;
-      ">${fallback}</span>
-    `;
+  function customAssets() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('cryptora_custom_assets') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
   }
 
-  return `
-    <img
-      src="${a.logo}"
-      alt="${symbol} logo"
-      width="30"
-      height="30"
-      loading="lazy"
-      referrerpolicy="no-referrer"
-      style="
-        width:30px;
-        height:30px;
-        min-width:30px;
-        border-radius:50%;
-        object-fit:contain;
-        background:#fff;
-      "
-      onerror="
-        this.style.display='none';
-        this.nextElementSibling.style.display='grid';
-      "
-    >
-
-    <span style="
-      display:none;
-      width:30px;
-      height:30px;
-      min-width:30px;
-      border-radius:50%;
-      background:#26334a;
-      color:#fff;
-      place-items:center;
-      font-size:13px;
-      font-weight:700;
-    ">${fallback}</span>
-  `;
-}
-
-
-// RENDER EVERYTHING
-
-function render() {
-  const searchElement = $('#search');
-
-  const q = (
-    searchElement?.value || ''
-  ).toLowerCase();
-
-  const list = assets.filter(a =>
-    (a.name + ' ' + a.symbol)
-      .toLowerCase()
-      .includes(q)
-  );
-
-  $('#assetCount').textContent = assets.length;
-
-  // MARKET TABLE WITH COIN LOGOS
-
-  $('#marketRows').innerHTML = list.map((a, i) => `
-    <tr>
-
-      <td>${i + 1}</td>
-
-      <td>
-        <div style="
-          display:flex;
-          align-items:center;
-          gap:10px;
-          min-width:150px;
-        ">
-
-          ${coinLogo(a)}
-
-          <div style="
-            display:flex;
-            flex-direction:column;
-            gap:3px;
-          ">
-            <span class="asset">${a.name}</span>
-
-            <span class="symbol">
-              ${a.symbol}${a.custom ? ' · CRYPTORA' : ''}
-            </span>
-          </div>
-
-        </div>
-      </td>
-
-      <td>${money(a.price)}</td>
-
-      <td class="${a.change >= 0 ? 'up' : 'down'}">
-        ${a.change >= 0 ? '+' : ''}
-        ${a.change.toFixed(2)}%
-      </td>
-
-      <td>${compact(marketCap(a))}</td>
-
-      <td>${compact(a.volume)}</td>
-
-      <td>
-        <button onclick="selectAsset('${a.symbol}')">
-          Trade →
-        </button>
-      </td>
-
-    </tr>
-  `).join('') || `
-    <tr>
-      <td colspan="7" class="empty">
-        No matching assets.
-      </td>
-    </tr>
-  `;
-
-
-  // TRADE ASSET SELECT
-
-  $('#assetSelect').innerHTML = assets.map(a => `
-    <option value="${a.symbol}">
-      ${a.symbol} — ${a.name}
-    </option>
-  `).join('');
-
-
-  updateTradePrice();
-
-
-  // USD BALANCE
-
-  $('#usdBalance').textContent = money(usd);
-  $('#walletTotal').textContent = money(usd);
-
-
-  // PORTFOLIO VALUE
-
-  let portfolio = usd + Object.entries(coins).reduce(
-    (s, [sym, n]) => {
-      const asset = assets.find(a => a.symbol === sym);
-
-      return s + n * (asset?.price || 0);
-    },
-    0
-  );
-
-  $('#portfolio').textContent = money(portfolio);
-
-
-  // CRYPTO HOLDINGS
-
-  $('#holdings').innerHTML = Object.entries(coins)
-    .filter(([s, n]) => n > 0)
-    .map(([s, n]) => `
-      <div class="holding">
-        <span>${s}</span>
-        <b>${Number(n).toFixed(8)}</b>
-      </div>
-    `).join('') || `
-      <div class="empty">
-        No crypto holdings yet.
-      </div>
-    `;
-
-
-  // ORDER HISTORY
-
-  $('#orderRows').innerHTML = orders.map(o => `
-    <tr>
-      <td>${o.time}</td>
-      <td>${o.sym}</td>
-
-      <td class="${o.side === 'Buy' ? 'up' : 'down'}">
-        ${o.side}
-      </td>
-
-      <td>${money(o.amount)}</td>
-      <td>${money(o.fee)}</td>
-      <td>${o.status}</td>
-    </tr>
-  `).join('') || `
-    <tr>
-      <td colspan="6" class="empty">
-        No orders yet.
-      </td>
-    </tr>
-  `;
-}
-
-
-// UPDATE TRADE PRICE
-
-function updateTradePrice() {
-  const a = assets.find(
-    x => x.symbol === $('#assetSelect').value
-  );
-
-  $('#tradePrice').textContent = a
-    ? money(a.price)
-    : '—';
-}
-
-
-// SELECT COIN TO TRADE
-
-function selectAsset(s) {
-  $('#assetSelect').value = s;
-
-  updateTradePrice();
-
-  location.hash = '#trade';
-}
-
-
-// LOAD LIVE MARKET DATA
-
-async function loadMarkets() {
-  $('#marketRows').innerHTML = `
-    <tr>
-      <td colspan="7" class="loading">
-        Loading live market data…
-      </td>
-    </tr>
-  `;
-
-  try {
-    const r = await fetch(API, {
-      cache: 'no-store'
-    });
-
-    if (!r.ok) {
-      throw new Error(
-        'Market API returned ' + r.status
-      );
-    }
-
-    const data = await r.json();
-
-    assets = mergeAssets(
-      data.map(normalized)
-    );
-
-    $('#lastUpdated').textContent =
-      'Updated ' +
-      new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-    $('#dataNote').textContent =
-      'Live market prices loaded directly from CoinGecko. No simulated price fallback is used.';
-
-    render();
-
-  } catch (e) {
-
-    console.error('Market loading error:', e);
-
-    assets = mergeAssets([]);
-
-    $('#lastUpdated').textContent =
-      'Live data unavailable';
-
-    $('#dataNote').textContent =
-      'Live market data could not be reached. Prices are not replaced with fake values; try Refresh again.';
-
-    render();
+  function marketCap(asset) {
+    return Number(asset.price || 0) * Number(asset.supply || 0);
   }
-}
 
-
-// SEARCH
-
-$('#search').oninput = render;
-
-
-// REFRESH BUTTON
-
-$('#refreshBtn').onclick = loadMarkets;
-
-
-// DARK / LIGHT MODE
-
-$('#themeBtn').onclick = () => {
-
-  document.body.classList.toggle('dark');
-
-  localStorage.setItem(
-    'cryptora_theme',
-    document.body.classList.contains('dark')
-      ? 'dark'
-      : 'light'
-  );
-
-};
-
-
-// BUY / SELL TABS
-
-document.querySelectorAll('.trade-tab')
-  .forEach(b => {
-
-    b.onclick = () => {
-
-      document.querySelectorAll('.trade-tab')
-        .forEach(x => x.classList.remove('active'));
-
-      b.classList.add('active');
-
-      currentSide = b.dataset.side;
-
-      $('#tradeBtn').textContent =
-        currentSide === 'Buy'
-          ? 'Place Test Buy Order'
-          : 'Place Test Sell Order';
-
-      updateTotals();
+  function normalized(coin) {
+    return {
+      id: coin.id, name: coin.name,
+      symbol: String(coin.symbol || '').toUpperCase(),
+      price: Number(coin.current_price || coin.price || 0),
+      supply: Number(coin.circulating_supply || coin.supply || 0),
+      change: Number(coin.price_change_percentage_24h_in_currency ?? coin.price_change_percentage_24h ?? coin.change ?? 0),
+      volume: Number(coin.total_volume || 0),
+      logo: coin.image || coin.logo || ''
     };
-
-  });
-
-
-// ASSET SELECT CHANGE
-
-$('#assetSelect').onchange = updateTradePrice;
-
-
-// TRADE AMOUNT INPUT
-
-$('#tradeAmount').oninput = updateTotals;
-
-
-// FEE + TOTAL CALCULATION
-
-function updateTotals() {
-
-  const a = Number(
-    $('#tradeAmount').value || 0
-  );
-
-  const fee = a * feeRate;
-
-  $('#fee').textContent = money(fee);
-
-  $('#total').textContent = money(
-    currentSide === 'Buy'
-      ? a + fee
-      : a - fee
-  );
-
-}
-
-
-// TEST BUY / SELL
-
-$('#tradeBtn').onclick = () => {
-
-  const sym = $('#assetSelect').value;
-
-  const amount = Number(
-    $('#tradeAmount').value || 0
-  );
-
-  const a = assets.find(
-    x => x.symbol === sym
-  );
-
-  if (!a || amount <= 0 || !Number.isFinite(amount)) {
-    return alert('Enter a valid USD amount.');
   }
 
-  const fee = amount * feeRate;
-
-  if (currentSide === 'Buy') {
-
-    const total = amount + fee;
-
-    if (usd < total) {
-      return alert('Insufficient USD balance.');
-    }
-
-    usd -= total;
-
-    coins[sym] = (coins[sym] || 0) +
-      amount / a.price;
-
-  } else {
-
-    const qty = amount / a.price;
-
-    if ((coins[sym] || 0) < qty) {
-      return alert('Insufficient crypto balance.');
-    }
-
-    coins[sym] -= qty;
-
-    usd += amount - fee;
-
+  function mergeAssets(live) {
+    const custom = customAssets().map((coin) => ({
+      id: 'custom-' + String(coin.symbol || '').toUpperCase(),
+      name: String(coin.name || 'Custom asset'),
+      symbol: String(coin.symbol || '').toUpperCase(),
+      price: Number(coin.price || 0), supply: Number(coin.supply || 0),
+      change: Number(coin.change || 0), volume: Number(coin.volume || 0),
+      logo: String(coin.logo || ''), custom: true
+    })).filter((coin) => coin.symbol && Number.isFinite(coin.price));
+    const map = new Map(live.map((asset) => [asset.symbol, asset]));
+    custom.forEach((asset) => map.set(asset.symbol, asset));
+    return [...map.values()].sort((a, b) => marketCap(b) - marketCap(a)).slice(0, 100);
   }
 
-  orders.unshift({
+  function coinLogo(asset) {
+    const symbol = escapeHtml(asset.symbol || '?');
+    const fallback = escapeHtml(symbol.charAt(0));
+    const fallbackHtml = `<span class="coin-fallback" aria-hidden="true">${fallback}</span>`;
+    if (!asset.logo) return fallbackHtml;
+    return `<img class="coin-logo" src="${escapeHtml(asset.logo)}" alt="${symbol} logo" width="30" height="30" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'coin-fallback',textContent:'${fallback}'}))">`;
+  }
 
-    time: new Date().toLocaleString('en-US'),
+  function setMessage(message, isError = false) {
+    const node = $('#authMessage');
+    if (!node) return;
+    node.textContent = message;
+    node.classList.toggle('error', isError);
+  }
 
-    sym,
+  function openAuth(mode) {
+    authMode = mode;
+    $('#authTitle').textContent = mode === 'register' ? 'Create your account' : 'Welcome back';
+    $('#authSubtitle').textContent = mode === 'register'
+      ? 'Register with your email address.'
+      : 'Log in to your CRYPTORA account.';
+    $('#authSubmit').textContent = mode === 'register' ? 'Create Account' : 'Log In';
+    $('#authPassword').autocomplete = mode === 'register' ? 'new-password' : 'current-password';
+    $('#displayNameLabel').hidden = mode !== 'register';
+    $('#authDisplayName').hidden = mode !== 'register';
+    $('#authDisplayName').required = mode === 'register';
+    $('#authSwitch').innerHTML = mode === 'register'
+      ? 'Already have an account? <button type="button" id="switchAuth">Log in</button>'
+      : 'New to CRYPTORA? <button type="button" id="switchAuth">Create an account</button>';
+    $('#authModal').hidden = false;
+    setMessage('');
+    $('#authEmail').focus();
+    $('#switchAuth').onclick = () => openAuth(mode === 'register' ? 'login' : 'register');
+  }
 
-    side: currentSide,
+  function closeAuth() {
+    $('#authModal').hidden = true;
+    $('#authForm').reset();
+    setMessage('');
+  }
 
-    amount,
+  function updateAccountUI() {
+    const loggedIn = Boolean(currentUser);
+    const label = currentProfile?.display_name || currentUser?.email || 'Guest';
+    $('#accountLabel').textContent = loggedIn ? label : 'Guest';
+    $('#accountStatus').textContent = loggedIn ? 'Connected' : 'Guest';
+    $('#accountHint').textContent = loggedIn ? 'Supabase account' : 'Log in to access your wallet';
+    $('#loginBtn').hidden = loggedIn;
+    $('#registerBtn').hidden = loggedIn;
+    $('#logoutBtn').hidden = !loggedIn;
+    $('#usdBalance').textContent = loggedIn ? money(walletBalance) : '—';
+    $('#walletTotal').textContent = loggedIn ? money(walletBalance) : '—';
+    $('#walletDescription').textContent = loggedIn
+      ? 'Available USD balance from your Supabase wallet.'
+      : 'Sign in to view your USD wallet balance.';
+    $('#portfolio').textContent = loggedIn ? money(walletBalance) : '—';
+    $('#portfolioStatus').textContent = loggedIn ? 'Wallet loaded' : 'Sign in to view wallet';
+    $('#holdings').innerHTML = loggedIn
+      ? '<div class="empty">No crypto holdings recorded yet.</div>'
+      : '<div class="empty">Sign in to view holdings.</div>';
+  }
 
-    fee,
+  async function loadAccountData() {
+    if (!supabase || !currentUser) {
+      currentProfile = null;
+      walletBalance = null;
+      updateAccountUI();
+      return;
+    }
+    const userId = currentUser.id;
+    const [profileResult, walletResult] = await Promise.all([
+      supabase.from('profiles').select('id,username,display_name,avatar_url').eq('id', userId).maybeSingle(),
+      supabase.from('wallets').select('id,currency,balance').eq('user_id', userId).eq('currency', 'USD').maybeSingle()
+    ]);
+    if (profileResult.error) console.error('Profile load error:', profileResult.error);
+    if (walletResult.error) console.error('Wallet load error:', walletResult.error);
+    currentProfile = profileResult.data || null;
+    walletBalance = walletResult.data ? Number(walletResult.data.balance) : null;
+    updateAccountUI();
+    if (!walletResult.data) {
+      $('#walletDescription').textContent = 'No USD wallet record found. Please contact support; do not create or credit balances from the browser.';
+    }
+  }
 
-    status: 'Filled'
+  async function handleAuthSubmit(event) {
+    event.preventDefault();
+    if (!supabase) return setMessage('Supabase is not configured. Check config.js.', true);
+    const email = $('#authEmail').value.trim();
+    const password = $('#authPassword').value;
+    const displayName = $('#authDisplayName').value.trim();
+    const submit = $('#authSubmit');
+    submit.disabled = true;
+    setMessage(authMode === 'register' ? 'Creating your account…' : 'Signing in…');
+    try {
+      if (authMode === 'register') {
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: {
+            data: { display_name: displayName },
+            emailRedirectTo: window.location.origin
+          }
+        });
+        if (error) throw error;
+        if (data.session) {
+          currentUser = data.user;
+          await loadAccountData();
+          closeAuth();
+        } else {
+          setMessage('Registration received. Check your email to confirm your account, then log in.');
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        currentUser = data.user;
+        await loadAccountData();
+        closeAuth();
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      setMessage(error.message || 'Authentication failed. Please try again.', true);
+    } finally {
+      submit.disabled = false;
+    }
+  }
 
+  async function initializeAuth() {
+    if (!window.supabase?.createClient) {
+      console.error('Supabase JS library did not load.');
+      setMessage('Supabase library failed to load. Check your internet connection.', true);
+      return;
+    }
+    if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY ||
+        config.SUPABASE_URL.includes('YOUR_') || config.SUPABASE_ANON_KEY.includes('YOUR_')) {
+      console.error('Supabase URL or publishable key is missing in config.js.');
+      return;
+    }
+    supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    const { data, error } = await supabase.auth.getSession();
+    if (error) console.error('Session restore error:', error);
+    currentUser = data?.session?.user || null;
+    await loadAccountData();
+    supabase.auth.onAuthStateChange((_event, session) => {
+      currentUser = session?.user || null;
+      // Avoid awaiting Supabase calls inside this callback; schedule account refresh.
+      Promise.resolve().then(loadAccountData);
+    });
+  }
+
+  function renderMarkets() {
+    const query = ($('#search')?.value || '').toLowerCase();
+    const list = assets.filter((asset) => (asset.name + ' ' + asset.symbol).toLowerCase().includes(query));
+    $('#assetCount').textContent = assets.length;
+    $('#marketRows').innerHTML = list.map((asset, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><div class="asset-cell">${coinLogo(asset)}<div><span class="asset">${escapeHtml(asset.name)}</span><span class="symbol">${escapeHtml(asset.symbol)}${asset.custom ? ' · CRYPTORA' : ''}</span></div></div></td>
+        <td>${money(asset.price)}</td>
+        <td class="${asset.change >= 0 ? 'up' : 'down'}">${asset.change >= 0 ? '+' : ''}${asset.change.toFixed(2)}%</td>
+        <td>${compact(marketCap(asset))}</td>
+        <td>${compact(asset.volume)}</td>
+        <td><button type="button" data-trade-symbol="${escapeHtml(asset.symbol)}">Trade →</button></td>
+      </tr>`).join('') || '<tr><td colspan="7" class="empty">No matching assets.</td></tr>';
+    $('#assetSelect').innerHTML = assets.map((asset) =>
+      `<option value="${escapeHtml(asset.symbol)}">${escapeHtml(asset.symbol)} — ${escapeHtml(asset.name)}</option>`
+    ).join('');
+    updateTradePrice();
+  }
+
+  async function loadMarkets() {
+    $('#marketRows').innerHTML = '<tr><td colspan="7" class="loading">Loading live market data…</td></tr>';
+    try {
+      const response = await fetch(API, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Market API returned ' + response.status);
+      const data = await response.json();
+      assets = mergeAssets(data.map(normalized));
+      $('#lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      $('#dataNote').textContent = 'Live market prices loaded from CoinGecko. Prices are periodically refreshed, not streamed tick-by-tick.';
+      renderMarkets();
+    } catch (error) {
+      console.error('Market loading error:', error);
+      assets = mergeAssets([]);
+      $('#lastUpdated').textContent = 'Live data unavailable';
+      $('#dataNote').textContent = 'Live market data could not be reached. No simulated price fallback is used; try Refresh again.';
+      renderMarkets();
+    }
+  }
+
+  function updateTradePrice() {
+    const asset = assets.find((item) => item.symbol === $('#assetSelect').value);
+    $('#tradePrice').textContent = asset ? money(asset.price) : '—';
+  }
+
+  function updateTotals() {
+    const amount = Number($('#tradeAmount').value || 0);
+    const fee = amount > 0 ? amount * feeRate : 0;
+    $('#fee').textContent = money(fee);
+    $('#total').textContent = money(currentSide === 'Buy' ? amount + fee : Math.max(0, amount - fee));
+  }
+
+  function bindEvents() {
+    $('#loginBtn').onclick = () => openAuth('login');
+    $('#registerBtn').onclick = () => openAuth('register');
+    $('#logoutBtn').onclick = async () => {
+      if (!supabase) return;
+      const { error } = await supabase.auth.signOut();
+      if (error) alert(error.message);
+      else {
+        currentUser = null; currentProfile = null; walletBalance = null;
+        updateAccountUI();
+      }
+    };
+    $('#authClose').onclick = closeAuth;
+    $('#authModal').addEventListener('click', (event) => {
+      if (event.target === $('#authModal')) closeAuth();
+    });
+    $('#authForm').addEventListener('submit', handleAuthSubmit);
+    $('#search').oninput = renderMarkets;
+    $('#refreshBtn').onclick = loadMarkets;
+    $('#assetSelect').onchange = updateTradePrice;
+    $('#tradeAmount').oninput = updateTotals;
+    $('#tradeBtn').disabled = true;
+    $('#tradeBtn').textContent = 'Trading unavailable';
+    $('#tradeBtn').onclick = () => alert('Buy/Sell is disabled until a secure server-side order engine is implemented. Your wallet balance cannot be safely changed from browser code.');
+    $('#depositBtn').onclick = () => alert('Deposits are not enabled yet. No real funds should be sent to this demo website.');
+    $('#withdrawBtn').onclick = () => alert('Withdrawals are not enabled yet. No blockchain transfers are connected.');
+    $('#themeBtn').onclick = () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('cryptora_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    };
+    document.querySelectorAll('.trade-tab').forEach((button) => {
+      button.onclick = () => {
+        document.querySelectorAll('.trade-tab').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        currentSide = button.dataset.side;
+        updateTotals();
+      };
+    });
+    $('#marketRows').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-trade-symbol]');
+      if (!button) return;
+      $('#assetSelect').value = button.dataset.tradeSymbol;
+      updateTradePrice();
+      location.hash = '#trade';
+    });
+  }
+
+  function restoreTheme() {
+    if (localStorage.getItem('cryptora_theme') === 'dark') document.body.classList.add('dark');
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    bindEvents();
+    restoreTheme();
+    updateAccountUI();
+    await initializeAuth();
+    await loadMarkets();
+    marketTimer = window.setInterval(loadMarkets, 60000);
   });
-
-  $('#tradeMsg').textContent =
-    `Test ${currentSide.toLowerCase()} filled at ${money(a.price)} per ${sym}.`;
-
-  render();
-
-};
-
-
-// REGISTER
-
-$('#registerBtn').onclick = () => {
-
-  alert(
-    'Registration will be connected to Supabase Auth.'
-  );
-
-};
-
-
-// LOGIN
-
-$('#loginBtn').onclick = () => {
-
-  alert(
-    'Login will be connected to Supabase Auth.'
-  );
-
-};
-
-
-// DEPOSIT
-
-$('#depositBtn').onclick = () => {
-
-  alert(
-    'Deposit: choose network → view admin-managed QR/address → submit request.'
-  );
-
-};
-
-
-// WITHDRAW
-
-$('#withdrawBtn').onclick = () => {
-
-  alert(
-    'Withdraw: choose network → upload receiving QR → enter address and amount → confirm. Processing time: 15–30 minutes.'
-  );
-
-};
-
-
-// RESTORE SAVED THEME
-
-if (
-  localStorage.getItem('cryptora_theme') === 'dark'
-) {
-  document.body.classList.add('dark');
-}
-
-
-// INITIALIZE
-
-$('#tradeBtn').textContent =
-  'Place Test Buy Order';
-
-loadMarkets();
-
-
-// AUTO REFRESH EVERY 60 SECONDS
-
-marketTimer = setInterval(
-  loadMarkets,
-  60000
-);
+})(); 
