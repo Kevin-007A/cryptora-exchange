@@ -1,0 +1,25 @@
+
+/* CRYPTORA authentication additions */
+[hidden] { display: none !important; }
+.account-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted, #667085); }
+.auth-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; background: rgba(3, 8, 20, .72); backdrop-filter: blur(8px); }
+.auth-dialog { position: relative; width: min(100%, 430px); max-height: min(90vh, 720px); overflow: auto; padding: 32px; border: 1px solid var(--line, #e7eaf0); border-radius: 20px; background: var(--surface, #fff); color: var(--text, #101828); box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.auth-close { position: absolute; top: 12px; right: 16px; border: 0; background: transparent; color: inherit; font-size: 28px; cursor: pointer; }
+.auth-brand { margin-bottom: 22px; }
+.auth-dialog h2 { margin: 0 0 8px; }
+.auth-dialog p { color: var(--muted, #667085); }
+.auth-dialog form { display: grid; gap: 10px; margin-top: 22px; }
+.auth-dialog input { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line, #e7eaf0); border-radius: 10px; background: var(--surface, #fff); color: var(--text, #101828); }
+.auth-dialog label { font-size: 13px; font-weight: 600; }
+.auth-dialog .full { width: 100%; margin-top: 10px; }
+.auth-switch { text-align: center; font-size: 13px; }
+.auth-switch button { border: 0; background: transparent; color: var(--accent, #2563eb); font-weight: 700; cursor: pointer; }
+.auth-message { min-height: 20px; font-size: 13px; color: var(--green, #0e9f6e); }
+.auth-message.error { color: #dc2626; }
+.auth-note { display: block; color: var(--muted, #667085); line-height: 1.5; }
+.asset-cell { display: flex; align-items: center; gap: 10px; min-width: 150px; }
+.asset-cell > div { display: flex; flex-direction: column; gap: 3px; }
+.coin-logo, .coin-fallback { width: 30px; height: 30px; min-width: 30px; border-radius: 50%; object-fit: contain; background: #fff; }
+.coin-fallback { display: grid; place-items: center; background: #26334a; color: #fff; font-size: 13px; font-weight: 700; }
+#tradeBtn:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 700px) { .auth-dialog { padding: 26px 20px; } .account-label { display: none; } }
